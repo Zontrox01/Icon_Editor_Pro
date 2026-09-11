@@ -26,9 +26,6 @@ Editor de iconos por capas para Windows/Linux/macOS, hecho con **Python** y **Py
 
 ## 📸 Capturas
 
-> _Añade aquí una captura de pantalla del editor (por ejemplo `recursos/screenshot.png`) y enlázala:_
->
-> `![Captura de Icon Editor Pro](recursos/screenshot.png)`
 > ![Captura de Icon Editor Pro](recursos/screenshot.png)
 
 
