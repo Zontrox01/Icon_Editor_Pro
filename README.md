@@ -85,7 +85,8 @@ icon_editor/
 │   └── icono_app.ico                # Icono de la aplicación
 │   └── screenshot.png                # Captura de imagen de la aplicación
 ├── requirements.txt
-└── README.md
+├── FILES.md
+└── README.md                  #Este archivo
 ```
 
 ## 🧰 Formatos de exportación
