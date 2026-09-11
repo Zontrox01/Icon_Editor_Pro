@@ -81,7 +81,8 @@ icon_editor/
 ├── ui/
 │   └── styles.py                # Hojas de estilo (tema claro y oscuro)
 ├── recursos/
-│   └── icono_aoo.png                # Icono de la aplicación
+│   └── icono_app.png                # Icono de la aplicación
+│   └── icono_app.ico                # Icono de la aplicación
 │   └── screenshot.png                # Captura de imagen de la aplicación
 ├── requirements.txt
 └── README.md
