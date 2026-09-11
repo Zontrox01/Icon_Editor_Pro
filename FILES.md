@@ -1,4 +1,68 @@
-# Icon Editor Pro — Histórico de cambios y pendientes
+# Icon Editor Pro — Estructura de archivos y carpetas e Histórico de cambios y pendientes
+
+# Estructura de carpetas
+
+**Fecha:** 2026-09-11 15:25:15
+
+**Carpeta:** C:/Users/Usuario/Documents/Mis programas Python/icon_editor
+
+## Estructura de carpetas
+
+```
+Estructura de: C:/Users/Usuario/Documents/Mis programas Python/icon_editor
+======================================================================
+Fecha: 2026-09-11 15:21:09
+
+- FILES.md
+- README.md
+- canvas.py
+- icon_exporter.py
+- image_importer.py
+- layer.py
+- main.py
+- main_window.py
+- preview_widget.py
+- project_manager.py
+- requirements.txt
+- text_tool.py
+[CARPETA] recursos
+    - icono_app.ico
+    - icono_app.png
+    - screenshot.png
+[CARPETA] tools
+    - __init__.py
+    - drawing_tools.py
+    - shape_tools.py
+[CARPETA] ui
+    - __init__.py
+    - styles.py
+```
+
+## Detalle estructurado
+
+- 📄 FILES.md
+- 📄 README.md
+- 📄 canvas.py
+- 📄 icon_exporter.py
+- 📄 image_importer.py
+- 📄 layer.py
+- 📄 main.py
+- 📄 main_window.py
+- 📄 preview_widget.py
+- 📄 project_manager.py
+- 📄 requirements.txt
+- 📄 text_tool.py
+- 📁 recursos
+  - 📄 icono_app.ico
+  - 📄 icono_app.png
+  - 📄 screenshot.png
+- 📁 tools
+  - 📄 __init__.py
+  - 📄 drawing_tools.py
+  - 📄 shape_tools.py
+- 📁 ui
+  - 📄 __init__.py
+  - 📄 styles.py
 
 Seguimiento de la sesión de revisión/pulido del proyecto. Se actualiza en cada ronda de cambios.
 
@@ -197,31 +261,7 @@ Con lápiz o borrador activos, el cursor ahora es un círculo con el diámetro R
 - **Fix:** ahora respeta la selección tal y como pediste: si marcas **un solo tamaño**, exporta un único archivo con el nombre tal cual (sin sufijo). Si marcas **varios**, exporta un archivo por cada tamaño, añadiendo el tamaño al nombre (`icono_128x128.png`, `icono_256x256.png`...).
 - **Nota sobre el `.ico`:** no lo he tocado, y quiero que sepas por qué antes de que lo pruebes y te extrañe: el formato `.ico` está pensado precisamente para llevar VARIOS tamaños dentro de un mismo archivo (así es como Windows elige automáticamente la resolución según dónde se use el icono) — por eso, si marcas 128 y 256 y exportas a `.ico`, obtienes **un solo archivo** `icono.ico` que lleva las dos resoluciones embebidas, no dos archivos sueltos. Es el comportamiento estándar y probablemente el que quieres para un `.ico` real. Si en cambio prefieres que también genere un `.ico` separado por cada tamaño (en vez de uno combinado), dímelo y lo cambio.
 
-## 🔍 Pendiente de revisar (no tocado todavía)
+## 🔍 Pendiente de revisar 
 
 Ninguno por ahora.
 
-## 📁 Archivos del proyecto
-```
-canvas.py
-icon_exporter.py
-image_importer.py
-layer.py
-main.py
-main_window.py
-preview_widget.py
-project_manager.py
-text_tool.py
-tools/
-  __init__.py
-  drawing_tools.py
-  shape_tools.py
-ui/
-  __init__.py
-  styles.py
-README.md
-requirements.txt
-FILES.md   ← este archivo
-```
-
-**Nota:** si tienes un `test_imports.py` en tu carpeta, no lo he creado yo en ningún momento de esta conversación — no forma parte de lo que hemos ido construyendo juntos. Comprueba si algún otro archivo lo importa antes de borrarlo, por si acaso.
