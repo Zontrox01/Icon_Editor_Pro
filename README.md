@@ -19,16 +19,16 @@ Editor de iconos por capas para Windows/Linux/macOS, hecho con **Python** y **Py
 - **Deshacer/rehacer independiente por capa**.
 - **Fondo transparente o de color**, configurable en cualquier momento sin afectar al contenido de las capas.
 - **Vista previa en vivo** a los tamaños de icono más habituales (256, 128, 64, 48, 32, 24, 16 px), a escala real.
-- **Exportación** a `.ico` (con varios tamaños embebidos en un mismo archivo), `.png` y `.bmp`.
+- **Exportación** a `.ico` (con varios tamaños embebidos en un mismo archivo), `.png`.
 - **Proyectos guardados** (`.ico_proj`) que conservan todas las capas, su orden, visibilidad, y el contenido editable de los textos — no solo la imagen final.
 - **Tema claro/oscuro** intercambiable desde el menú *Ver*.
 - Lienzo redimensionable (16 a 256 px o tamaño personalizado) y cursor de pincel que refleja el grosor real de la herramienta.
 
 ## 📸 Capturas
 
-> _Añade aquí una captura de pantalla del editor (por ejemplo `docs/screenshot.png`) y enlázala:_
+> _Añade aquí una captura de pantalla del editor (por ejemplo `recursos/screenshot.png`) y enlázala:_
 >
-> `![Captura de Icon Editor Pro](docs/screenshot.png)`
+> `![Captura de Icon Editor Pro](recursos/screenshot.png)`
 
 ## 🚀 Instalación
 
@@ -36,8 +36,8 @@ Requiere **Python 3.10 o superior**.
 
 ```bash
 # Clona el repositorio
-git clone https://github.com/tu-usuario/icon-editor-pro.git
-cd icon-editor-pro
+git clone https://github.com/Zontro01/icon_editor_pro.git
+cd icon_editor_pro
 
 # (Recomendado) crea un entorno virtual
 python -m venv venv
@@ -61,7 +61,7 @@ python main.py
 3. Usa la herramienta **✋ Mover** para seleccionar y ajustar cualquier objeto ya creado, en cualquier momento.
 4. Organiza las capas desde el panel de la derecha (subir, bajar, ocultar, renombrar).
 5. Revisa la vista previa a los distintos tamaños de icono.
-6. Exporta desde *Archivo* a `.ico`, `.png` o `.bmp`, o guarda el proyecto completo (`.ico_proj`) para seguir editándolo más adelante.
+6. Exporta desde *Archivo* a `.ico`, `.png`, o guarda el proyecto completo (`.ico_proj`) para seguir editándolo más adelante.
 
 ## 🗂️ Estructura del proyecto
 
@@ -73,7 +73,7 @@ icon_editor/
 ├── layer.py                 # Clase Layer (imagen + nombre + visibilidad + historial propio)
 ├── text_tool.py              # Diálogo de inserción/edición de texto
 ├── image_importer.py         # Importación de imágenes externas
-├── icon_exporter.py           # Exportación a .ico / .png / .bmp
+├── icon_exporter.py           # Exportación a .ico / .png 
 ├── project_manager.py         # Guardado/carga de proyectos (.ico_proj)
 ├── preview_widget.py           # Tarjetas de vista previa por tamaño
 ├── tools/
@@ -81,6 +81,9 @@ icon_editor/
 │   └── shape_tools.py          # Formas geométricas
 ├── ui/
 │   └── styles.py                # Hojas de estilo (tema claro y oscuro)
+├── recursos/
+│   └── icono_aoo.png                # Icono de la aplicación
+│   └── screenshot.png                # Captura de imagen de la aplicación
 ├── requirements.txt
 └── README.md
 ```
@@ -91,7 +94,6 @@ icon_editor/
 |---------|-------------|-----------------------------------------------|
 | Icono Windows | `.ico` | Puede incluir varios tamaños en varios archivos |
 | PNG     | `.png`      | Con transparencia real                         |
-| Bitmap  | `.bmp`      | Sin canal alfa                                 |
 
 ## 📄 Proyectos (`.ico_proj`)
 

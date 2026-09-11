@@ -29,6 +29,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Icon Editor Pro")
         self.setMinimumSize(1200, 800)
+
+        ruta_icono = os.path.join(os.path.dirname(__file__), "recursos", "icono_app.png")
+        self.setWindowIcon(QIcon(ruta_icono))
         
         # Inicializar managers
         self.project_manager = ProjectManager()
