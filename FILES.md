@@ -1,17 +1,9 @@
 # Icon Editor Pro — Estructura de archivos y carpetas e Histórico de cambios y pendientes
 
-# Estructura de carpetas
-
-**Fecha:** 2026-09-11 15:25:15
-
-**Carpeta:** C:/Users/Usuario/Documents/Mis programas Python/icon_editor
-
 ## Estructura de carpetas
 
 ```
-Estructura de: C:/Users/Usuario/Documents/Mis programas Python/icon_editor
 ======================================================================
-Fecha: 2026-09-11 15:21:09
 
 - FILES.md
 - README.md
