@@ -15,6 +15,7 @@ Editor de iconos por capas para Windows/Linux/macOS, hecho con **Python** y **Py
 - **Herramientas de dibujo**: lápiz, borrador (con borrado real a transparente), línea, rectángulo, círculo, triángulo y relleno por inundación (con tolerancia de color ajustable y opción de vaciar a transparente).
 - **Herramienta de texto** con tipografía, tamaño, negrita, cursiva, subrayado y color — completamente reeditable después de insertado.
 - **Importación de imágenes** (PNG, JPG, BMP, GIF, TIFF, WEBP) como objetos flotantes que puedes mover y redimensionar antes de fijarlos.
+- **Importación de archivos ico** (ico) como objetos flotantes que puedes mover y redimensionar antes de fijarlos.
 - **Panel de capas**: añadir, eliminar, reordenar (subir/bajar), mostrar/ocultar y renombrar capas.
 - **Deshacer/rehacer independiente por capa**.
 - **Fondo transparente o de color**, configurable en cualquier momento sin afectar al contenido de las capas.
