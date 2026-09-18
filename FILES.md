@@ -253,7 +253,28 @@ Con lápiz o borrador activos, el cursor ahora es un círculo con el diámetro R
 - **Fix:** ahora respeta la selección tal y como pediste: si marcas **un solo tamaño**, exporta un único archivo con el nombre tal cual (sin sufijo). Si marcas **varios**, exporta un archivo por cada tamaño, añadiendo el tamaño al nombre (`icono_128x128.png`, `icono_256x256.png`...).
 - **Nota sobre el `.ico`:** no lo he tocado, y quiero que sepas por qué antes de que lo pruebes y te extrañe: el formato `.ico` está pensado precisamente para llevar VARIOS tamaños dentro de un mismo archivo (así es como Windows elige automáticamente la resolución según dónde se use el icono) — por eso, si marcas 128 y 256 y exportas a `.ico`, obtienes **un solo archivo** `icono.ico` que lleva las dos resoluciones embebidas, no dos archivos sueltos. Es el comportamiento estándar y probablemente el que quieres para un `.ico` real. Si en cambio prefieres que también genere un `.ico` separado por cada tamaño (en vez de uno combinado), dímelo y lo cambio.
 
-## 🔍 Pendiente de revisar 
+### 32. Nueva función: Importar ICO (`image_importer.py`, `main_window.py`)
+- **"Importar ICO..."** añadido al menú Archivo (`Ctrl+Shift+I`) y a la barra de herramientas, justo entre Rehacer e Importar Imagen, tal y como pediste.
+- **Diseño (dos decisiones que tomé y te explico):**
+  1. **Reemplaza el proyecto, no lo añade como objeto flotante** — a diferencia de "Importar Imagen" (que añade la imagen como un objeto más sobre lo que ya tuvieras), "Importar ICO" trata el archivo como si "abrieras" ese icono para seguir editándolo: sustituye todo el lienzo por su contenido, y ajusta el tamaño del lienzo a la resolución nativa del icono. Por eso, si hay cambios sin guardar, se ofrece guardar el proyecto actual primero — exactamente el comportamiento que pediste, y el mismo patrón que ya usaba "Nuevo Proyecto" (ahora compartido mediante un pequeño helper `confirm_discard_changes()`).
+  2. **Si el `.ico` lleva varias resoluciones embebidas** (lo habitual), se usa automáticamente la más grande para partir del mejor detalle posible — no se pregunta cuál usar. Si prefieres poder elegir tú la resolución de partida cuando haya varias, dímelo y añado un selector.
+
+### 33. Cada capa guarda su propia posición: ya no se recorta contenido al mover fuera del lienzo (`layer.py`, `canvas.py`, `project_manager.py`)
+Este era el fondo del problema: el modelo asumía que toda capa ocupaba EXACTAMENTE el tamaño del lienzo, ancladas en (0,0). Al mover un objeto parcialmente fuera y fijarlo, se "horneaba" dentro de un lienzo del tamaño del canvas, y QPainter recortaba silenciosamente lo que sobresalía — para siempre, sin poder recuperarlo.
+- **`Layer` ahora tiene `position`** (esquina superior izquierda, puede ser negativa o salirse del lienzo por cualquier lado) además de su imagen, que ya no tiene por qué medir el lienzo entero — se recorta a su contenido real. El historial de cada capa guarda también la posición (mover también se puede deshacer).
+- **Solo se recorta la VISUALIZACIÓN, nunca los datos:** `composite_layers()` dibuja cada capa en su posición real; lo que quede fuera del lienzo se recorta de la imagen final compuesta (para ver/exportar), pero la capa en sí conserva TODO su contenido intacto. Si mueves el objeto de vuelta dentro, aparece completo.
+- Simplifica de paso `edit_layer_content` (reeditar texto) y `set_canvas_size` (cambiar el tamaño del lienzo), que antes tenían que "encajar a la fuerza" el contenido y podían recortar por el mismo motivo.
+- Lápiz, borrador y relleno traducen correctamente sus coordenadas a la posición de la capa activa (por si no está en (0,0) — p. ej. el borrador actuando directamente sobre una imagen importada). El lápiz, además, agranda automáticamente la capa si dibujas justo en su borde, para poder seguir pintando en cualquier parte tras haber movido una capa de dibujo.
+- **Guardar/cargar proyecto** ahora también persiste la posición de cada capa (compatible con proyectos antiguos: se asume (0,0) si no la traen).
+
+### 34. Nuevas herramientas: Seleccionar y Recortar (`canvas.py`, `main_window.py`)
+- **"▭ Seleccionar"**: arrastra un rectángulo sobre el lienzo (independiente de qué capa esté activa). Si al soltar la selección se sale de los límites de la capa activa, aparece un aviso en la barra de estado — no se impide, solo se advierte (al recortar, solo se conservará la parte que se solape). `Esc` descarta la selección.
+- **"✂️ Recortar selección"** (botón, no una herramienta persistente): recorta la CAPA ACTIVA a la zona seleccionada. Si no hay ninguna selección hecha, avisa y no hace nada. Si la selección solo se solapa parcialmente con la capa, recorta solo esa parte solapada.
+
+### 35. Cuadrícula de transparencia se salía del lienzo al redimensionar los paneles (`canvas.py`)
+- **Causa:** la cuadrícula se dibuja en pasos de tamaño de celda (`int(grid_size)`), y la última celda de cada fila/columna puede "pasarse" un poco del borde real por redondeo — normalmente invisible porque ese sobrante cae fuera del widget, pero cuando el ancho de la ventana manda sobre el alto (justo lo que pasa al estrechar los paneles laterales), sobra espacio vertical alrededor del lienzo cuadrado, y ahí sí se veía ese sobrante de cuadrícula por encima/debajo de la línea gris que marca el tamaño real.
+- **Fix:** recortado (`setClipRect`) el dibujo de la cuadrícula exactamente al recuadro real del lienzo, así que nunca puede sobresalir por redondeo, se note o no se note.
+
+## 🔍 Pendiente de revisar (no tocado todavía)
 
 Ninguno por ahora.
-
