@@ -37,6 +37,7 @@ class ProjectManager:
                 'name': layer.name,
                 'visible': layer.visible,
                 'layer_type': getattr(layer, 'layer_type', 'generic'),
+                'position': [layer.position.x(), layer.position.y()],
                 'image_data': image_b64
             }
             
@@ -172,6 +173,7 @@ class ProjectManager:
                     'image': qimage,
                     'layer_type': layer_type,
                     'data': data,
+                    'position': layer_info.get('position', [0, 0]),
                 })
             canvas.load_layers_data(layers_data, project_data.get('active_layer_index', 0))
         else:

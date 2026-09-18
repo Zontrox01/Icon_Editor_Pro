@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Icon Editor Pro")
         self.setMinimumSize(1200, 800)
-
+        
         ruta_icono = os.path.join(os.path.dirname(__file__), "recursos", "icono_app.png")
         self.setWindowIcon(QIcon(ruta_icono))
         
@@ -119,6 +119,7 @@ class MainWindow(QMainWindow):
         # Botones de herramientas
         tool_buttons = [
             ("✋ Mover", "move"),
+            ("▭ Seleccionar", "select"),
             ("✏️ Lápiz", "pencil"),
             ("🧹 Borrador", "eraser"),
             ("⬜ Rectángulo", "rectangle"),
@@ -167,6 +168,14 @@ class MainWindow(QMainWindow):
         self.fill_tolerance_spin.valueChanged.connect(lambda v: self.canvas.set_fill_tolerance(v))
         fill_tolerance_layout.addWidget(self.fill_tolerance_spin)
         tools_layout.addLayout(fill_tolerance_layout)
+        
+        crop_btn = QPushButton("✂️ Recortar selección")
+        crop_btn.setToolTip(
+            "Recorta la capa activa a la zona marcada con la herramienta\n"
+            "«Seleccionar». Avisa si no hay ninguna selección hecha."
+        )
+        crop_btn.clicked.connect(lambda: self.canvas.crop_selection())
+        tools_layout.addWidget(crop_btn)
         
         layout.addWidget(tools_group)
         
@@ -428,6 +437,11 @@ class MainWindow(QMainWindow):
         
         file_menu.addSeparator()
         
+        import_ico_action = QAction("Importar ICO...", self)
+        import_ico_action.setShortcut("Ctrl+Shift+I")
+        import_ico_action.triggered.connect(self.import_ico)
+        file_menu.addAction(import_ico_action)
+        
         import_action = QAction("Importar Imagen...", self)
         import_action.setShortcut("Ctrl+I")
         import_action.triggered.connect(self.import_image)
@@ -482,6 +496,7 @@ class MainWindow(QMainWindow):
             ("Deshacer", "undo", self.undo_action),
             ("Rehacer", "redo", self.redo_action),
             (None, None, None),  # Separador
+            ("Importar ICO", "import_ico", self.import_ico),
             ("Importar Imagen", "import", self.import_image),
             (None, None, None),  # Separador
             ("Exportar ICO", "export_ico", self.export_ico),
@@ -738,18 +753,26 @@ class MainWindow(QMainWindow):
                 "Enter o «Fijar» lo deja listo sin perder la edición"
             )
     
-    def new_project(self):
-        """Crear nuevo proyecto"""
+    def confirm_discard_changes(self, action_description="continuar"):
+        """Si hay cambios sin guardar en el lienzo, pregunta si guardarlos
+        antes de continuar. Devuelve True si se puede continuar (se guardó, o
+        el usuario no quería guardar), o False si el usuario ha cancelado."""
         if self.canvas.is_modified():
             reply = QMessageBox.question(
                 self, "Guardar cambios",
-                "¿Quieres guardar los cambios antes de crear un nuevo proyecto?",
+                f"¿Quieres guardar los cambios antes de {action_description}?",
                 QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
             )
             if reply == QMessageBox.Yes:
                 self.save_project()
             elif reply == QMessageBox.Cancel:
-                return
+                return False
+        return True
+    
+    def new_project(self):
+        """Crear nuevo proyecto"""
+        if not self.confirm_discard_changes("crear un nuevo proyecto"):
+            return
         
         self.canvas.clear_canvas()
         self.statusbar.showMessage("Nuevo proyecto creado")
@@ -816,6 +839,26 @@ class MainWindow(QMainWindow):
                 self.update_previews()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"No se pudo importar la imagen:\n{str(e)}")
+    
+    def import_ico(self):
+        """Importar un .ico existente como base del proyecto (reemplaza el
+        lienzo actual, por eso se ofrece guardar antes si hay cambios sin
+        guardar, igual que al crear un proyecto nuevo)."""
+        if not self.confirm_discard_changes("importar el ICO"):
+            return
+        
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Importar ICO",
+            "", "Iconos (*.ico);;Todos los archivos (*.*)"
+        )
+        if file_path:
+            try:
+                self.image_importer.import_ico(file_path, self.canvas)
+                self.statusbar.showMessage(f"ICO importado: {os.path.basename(file_path)}")
+                self.refresh_layers_list()
+                self.update_previews()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"No se pudo importar el ICO:\n{str(e)}")
     
     def export_ico(self):
         """Exportar como ICO"""
