@@ -93,6 +93,14 @@ class Canvas(QWidget):
         # ni la que esté activa ahora mismo) y la deja lista para mover/redimensionar
         # (ver enter_layer_edit_mode: reutiliza el mismo mecanismo de imagen flotante).
         
+        # Herramienta "Seleccionar": arrastra un rectángulo (coords. de canvas,
+        # absolutas) que queda marcado hasta que se recorta (ver crop_selection)
+        # o se vuelve a seleccionar otra zona. Si la selección se sale de los
+        # límites de la capa activa, se avisa (no se impide).
+        self.selection_start_point = None    # QPoint donde empezó el arrastre de selección
+        self.selection_preview_rect = None   # QRect en vivo mientras se arrastra
+        self.selection_rect = None           # QRect ya confirmado (al soltar)
+        
         self.fill_transparent = False    # si el relleno (flood fill) usa transparente en vez del color activo
         self.fill_tolerance = 100        # tolerancia de color del relleno (ver drawing_tools.flood_fill)
         
@@ -146,24 +154,21 @@ class Canvas(QWidget):
         self.layers_changed.emit()
     
     def set_canvas_size(self, size):
-        """Cambiar tamaño del canvas (afecta a TODAS las capas, cada una conserva
-        su contenido centrado en el nuevo tamaño)"""
+        """Cambiar tamaño del canvas: cada capa conserva su imagen tal cual
+        (no se recorta ni se vuelve a hornear), solo se desplaza su posición
+        para mantenerla centrada respecto al nuevo tamaño del lienzo. Antes,
+        cambiar el tamaño (sobre todo encoger) podía recortar contenido de las
+        capas; ahora, al guardar cada una su propia posición, nada se pierde."""
         if self.floating_image is not None:
             self.apply_floating_image()
         if size == self.canvas_size:
             return
         
-        x_offset = (size - self.canvas_size) // 2
-        y_offset = (size - self.canvas_size) // 2
+        offset = (size - self.canvas_size) // 2
         
         for layer in self.layers:
-            new_image = QImage(size, size, QImage.Format_ARGB32)
-            new_image.fill(Qt.transparent)
-            painter = QPainter(new_image)
-            painter.drawImage(x_offset, y_offset, layer.image)
-            painter.end()
-            layer.image = new_image
-            # El historial de cada capa se reinicia con el nuevo tamaño
+            layer.position = QPoint(layer.position.x() + offset, layer.position.y() + offset)
+            # El historial de cada capa se reinicia con el nuevo tamaño/posición
             layer.history = []
             layer.history_index = -1
             layer.save_history()
@@ -182,6 +187,8 @@ class Canvas(QWidget):
             self.apply_floating_image()
         self.shape_start_point = None
         self.shape_preview_image = None
+        self.selection_start_point = None
+        self.selection_preview_rect = None
         self.current_tool = tool
         # Actualizar las herramientas
         self.drawing_tools.set_tool(tool)
@@ -257,8 +264,12 @@ class Canvas(QWidget):
     
     def composite_layers(self):
         """Compone el fondo (transparente o de color) y todas las capas VISIBLES
-        (de abajo a arriba) en una única QImage. Esto es lo que se ve en pantalla
-        y lo que se exporta/guarda; ninguna capa individual incluye el fondo."""
+        (de abajo a arriba) en una única QImage del tamaño del lienzo. Esto es
+        lo que se ve en pantalla y lo que se exporta/guarda; ninguna capa
+        individual incluye el fondo. Cada capa se dibuja en SU PROPIA posición
+        (puede ser negativa o salirse del lienzo): aquí es donde se recorta la
+        VISUALIZACIÓN al tamaño del lienzo (QPainter recorta automáticamente lo
+        que quede fuera), pero la imagen de la capa en sí nunca se toca."""
         result = QImage(self.canvas_size, self.canvas_size, QImage.Format_ARGB32)
         if self.bg_transparent:
             result.fill(Qt.transparent)
@@ -271,7 +282,7 @@ class Canvas(QWidget):
         # lista) a arriba (primera), para que la superior quede encima del todo.
         for layer in reversed(self.layers):
             if layer.visible:
-                painter.drawImage(0, 0, layer.image)
+                painter.drawImage(layer.position, layer.image)
         painter.end()
         return result
     
@@ -339,7 +350,7 @@ class Canvas(QWidget):
         
         new_layers = []
         for data in layers_data:
-            layer = Layer(data['name'], data['image'])
+            layer = Layer(data['name'], data['image'], position=data.get('position'))
             layer.visible = data.get('visible', True)
             layer.layer_type = data.get('layer_type', 'generic')
             layer.data = data.get('data', {}) or {}
@@ -393,7 +404,13 @@ class Canvas(QWidget):
         
         if len(self.layers) == 1:
             # No podemos quedarnos sin ninguna capa: la vaciamos en su lugar
-            self.layers[0].image.fill(Qt.transparent)
+            # (reseteada a un lienzo completo en blanco en (0,0), no solo
+            # transparentada tal cual estuviera, que podía quedar con un
+            # tamaño/posición residual de antes)
+            blank = QImage(self.canvas_size, self.canvas_size, QImage.Format_ARGB32)
+            blank.fill(Qt.transparent)
+            self.layers[0].image = blank
+            self.layers[0].position = QPoint(0, 0)
             self.layers[0].save_history()
             self.update_display()
             self.image_changed.emit()
@@ -469,6 +486,50 @@ class Canvas(QWidget):
             return
         self.layers[index].name = name.strip()
         self.layers_changed.emit()
+    
+    def crop_selection(self):
+        """Recorta la CAPA ACTIVA a la zona actualmente seleccionada (ver
+        herramienta "Seleccionar"). Si no hay ninguna selección, o no se
+        solapa en absoluto con la capa activa, avisa y no hace nada. Si la
+        selección se sale parcialmente de la capa, se recorta solo a la parte
+        que sí se solapa."""
+        if self.selection_rect is None:
+            self.status_message.emit("Recortar: no hay ninguna zona seleccionada")
+            return False
+        
+        if self.floating_image is not None:
+            self.apply_floating_image()
+        
+        layer = self.layers[self.active_layer_index]
+        intersection = self.selection_rect.intersected(layer.bounds())
+        
+        if intersection.isEmpty():
+            self.status_message.emit(
+                f"Recortar: la selección no se solapa con la capa activa '{layer.name}'"
+            )
+            return False
+        
+        local_rect = QRect(
+            intersection.x() - layer.position.x(), intersection.y() - layer.position.y(),
+            intersection.width(), intersection.height()
+        )
+        layer.image = layer.image.copy(local_rect)
+        layer.position = intersection.topLeft()
+        
+        self.selection_rect = None
+        self.save_to_history()
+        self.update_display()
+        self.image_changed.emit()
+        self.layers_changed.emit()
+        self.status_message.emit(f"Recortado a {intersection.width()}x{intersection.height()} px")
+        return True
+    
+    def clear_selection(self):
+        """Descartar la selección actual sin recortar nada"""
+        self.selection_rect = None
+        self.selection_start_point = None
+        self.selection_preview_rect = None
+        self.update_display()
     
     def set_image_with_transform(self, image, offset=None, scale=None):
         """Establecer imagen con transformación (offset y escala)"""
@@ -565,6 +626,15 @@ class Canvas(QWidget):
             grid_size = 10 * self.scale_factor
             if grid_size > 1:
                 painter.save()
+                # Recortar exactamente al recuadro real del lienzo: sin esto,
+                # la última celda de cada fila/columna puede "pasarse" un poco
+                # del borde por redondeo (int(grid_size) no divide siempre
+                # exacto a display_width/height). Normalmente no se nota
+                # porque ese sobrante cae fuera del widget, pero cuando el
+                # ancho manda sobre el alto (por ejemplo al estrechar los
+                # paneles laterales) sobra espacio vertical alrededor del
+                # lienzo, y ahí sí se veía ese sobrante de cuadrícula.
+                painter.setClipRect(self.offset_x, self.offset_y, display_width, display_height)
                 # Dibujar patrón de cuadrícula
                 for x in range(0, display_width, int(grid_size)):
                     for y in range(0, display_height, int(grid_size)):
@@ -604,6 +674,21 @@ class Canvas(QWidget):
                 display_width, display_height, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             painter.drawImage(self.offset_x, self.offset_y, scaled_shape)
+        
+        # Dibujar el rectángulo de selección (en vivo mientras se arrastra, o
+        # ya confirmado tras soltar) en naranja discontinuo, para distinguirlo
+        # del azul de la imagen flotante
+        rect_to_draw = self.selection_preview_rect if self.selection_preview_rect is not None else self.selection_rect
+        if rect_to_draw is not None:
+            wx = self.offset_x + rect_to_draw.x() * self.scale_factor
+            wy = self.offset_y + rect_to_draw.y() * self.scale_factor
+            ww = rect_to_draw.width() * self.scale_factor
+            wh = rect_to_draw.height() * self.scale_factor
+            painter.save()
+            painter.setPen(QPen(QColor(255, 140, 0), 2, Qt.DashLine))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(int(wx), int(wy), int(ww), int(wh))
+            painter.restore()
     
     def draw_floating_overlay(self, painter):
         """Dibuja la imagen flotante en su posición/tamaño actual, con un borde
@@ -708,6 +793,14 @@ class Canvas(QWidget):
                     self.setCursor(Qt.SizeAllCursor)
                 return
             
+            if self.current_tool == "select":
+                # Herramienta Seleccionar: arrastra un rectángulo (marca la
+                # zona para luego recortarla con "Recortar"). No pertenece a
+                # ninguna capa en particular hasta que se recorta.
+                self.selection_start_point = self.widget_to_canvas_point(event.pos())
+                self.selection_preview_rect = QRect(self.selection_start_point, self.selection_start_point)
+                return
+            
             if self.current_tool == "fill":
                 # Relleno: se ejecuta UNA sola vez en el punto de clic, no en cada
                 # movimiento del mouse, y sin dejar una marca de pincel antes de
@@ -733,10 +826,15 @@ class Canvas(QWidget):
                         )
                         if region:
                             fill_color = QColor(0, 0, 0, 0) if self.fill_transparent else self.draw_color
-                            image = self.current_image.copy()
+                            layer = self.layers[self.active_layer_index]
+                            image = layer.image.copy()
+                            lw, lh = image.width(), image.height()
+                            px, py = layer.position.x(), layer.position.y()
                             for (x, y) in region:
-                                image.setPixelColor(x, y, fill_color)
-                            self.current_image = image
+                                lx, ly = x - px, y - py
+                                if 0 <= lx < lw and 0 <= ly < lh:
+                                    image.setPixelColor(lx, ly, fill_color)
+                            layer.image = image
                             self.update_display()
                             self.save_to_history()
                             self.image_changed.emit()
@@ -808,6 +906,12 @@ class Canvas(QWidget):
             self.setCursor(Qt.OpenHandCursor if self.hit_test_layer(point) is not None else Qt.ArrowCursor)
             return
         
+        if self.selection_start_point is not None and event.buttons() & Qt.LeftButton:
+            current_point = self.widget_to_canvas_point(event.pos())
+            self.selection_preview_rect = QRect(self.selection_start_point, current_point).normalized()
+            self.update_display()
+            return
+        
         if self.shape_start_point is not None and self.shape_preview_image is not None \
                 and event.buttons() & Qt.LeftButton:
             current_point = self.widget_to_canvas_point(event.pos())
@@ -834,6 +938,31 @@ class Canvas(QWidget):
                 self.floating_drag_start_rect = None
                 return
             
+            if self.selection_start_point is not None:
+                end_point = self.widget_to_canvas_point(event.pos())
+                rect = QRect(self.selection_start_point, end_point).normalized()
+                self.selection_start_point = None
+                self.selection_preview_rect = None
+                
+                if rect.width() < 2 or rect.height() < 2:
+                    # Arrastre insignificante (casi un clic): se descarta sin marcar nada
+                    self.selection_rect = None
+                    self.update_display()
+                    return
+                
+                self.selection_rect = rect
+                layer = self.layers[self.active_layer_index]
+                if not layer.bounds().contains(rect):
+                    self.status_message.emit(
+                        f"Selección de {rect.width()}x{rect.height()} px — OJO: parte "
+                        f"queda fuera de la capa activa '{layer.name}'. Al recortar, solo "
+                        "se conservará la parte que se solape con ella."
+                    )
+                else:
+                    self.status_message.emit(f"Selección: {rect.width()}x{rect.height()} px")
+                self.update_display()
+                return
+            
             if self.shape_start_point is not None:
                 # Fijar la forma definitiva entre el punto de inicio y el de soltar,
                 # como CAPA NUEVA (no se mezcla con ninguna capa existente)
@@ -855,8 +984,8 @@ class Canvas(QWidget):
     
     def hit_test_layer(self, point, prefer_bbox=False):
         """Devuelve el índice de la capa VISIBLE más alta (más cercana al frente)
-        que hay en `point`, o None si ninguna coincide. self.layers[0] es la
-        superior, así que se recorre en ese mismo orden.
+        que hay en `point` (coords. de canvas), o None si ninguna coincide.
+        self.layers[0] es la superior, así que se recorre en ese mismo orden.
         
         Primero se prueba con el píxel EXACTO (rápido, sin conversiones de
         formato: válido para el simple paso del cursor en cada mouseMoveEvent).
@@ -870,8 +999,11 @@ class Canvas(QWidget):
         for index, layer in enumerate(self.layers):
             if not layer.visible:
                 continue
-            if layer.image.pixelColor(point).alpha() > 0:
-                return index
+            local_x = point.x() - layer.position.x()
+            local_y = point.y() - layer.position.y()
+            if 0 <= local_x < layer.image.width() and 0 <= local_y < layer.image.height():
+                if layer.image.pixelColor(local_x, local_y).alpha() > 0:
+                    return index
         
         if not prefer_bbox:
             return None
@@ -880,8 +1012,13 @@ class Canvas(QWidget):
             if not layer.visible:
                 continue
             bbox = self._bounding_box_of_content(layer.image)
-            if bbox is not None and bbox.contains(point):
-                return index
+            if bbox is not None:
+                absolute_bbox = QRect(
+                    layer.position.x() + bbox.x(), layer.position.y() + bbox.y(),
+                    bbox.width(), bbox.height()
+                )
+                if absolute_bbox.contains(point):
+                    return index
         return None
     
     def enter_layer_edit_mode(self, index):
@@ -889,9 +1026,10 @@ class Canvas(QWidget):
         de una capa YA EXISTENTE —por ejemplo, tras seleccionarla en el panel de
         capas o con la herramienta Mover—, para poder seguir editándola como si
         acabara de insertarse. Reutiliza el mismo mecanismo de "imagen flotante":
-        el contenido se recorta de la capa y se muestra flotando con handles;
-        al fijarlo (Enter / «Fijar») se sustituye el contenido de ESA MISMA capa,
-        no se crea una nueva."""
+        el contenido se recorta de la capa y se muestra flotando con handles, en
+        su posición ABSOLUTA real (la capa puede estar parcialmente fuera del
+        lienzo); al fijarlo (Enter / «Fijar») se sustituye el contenido de ESA
+        MISMA capa, no se crea una nueva."""
         if not (0 <= index < len(self.layers)):
             return
         if self.floating_image is not None:
@@ -900,20 +1038,30 @@ class Canvas(QWidget):
         layer = self.layers[index]
         bbox = self._bounding_box_of_content(layer.image)
         if bbox is None:
-            # Capa en blanco: no hay nada que recortar, partimos del lienzo entero
-            bbox = QRect(0, 0, self.canvas_size, self.canvas_size)
+            # Capa en blanco: no hay nada que recortar, partimos de toda su imagen
+            bbox = QRect(0, 0, layer.image.width(), layer.image.height())
         cropped = layer.image.copy(bbox)
+        absolute_rect = QRect(
+            layer.position.x() + bbox.x(), layer.position.y() + bbox.y(),
+            bbox.width(), bbox.height()
+        )
         
-        # "Levantamos" el contenido de la capa: se vacía temporalmente mientras
-        # se edita como flotante, y se restaura (con los cambios) al fijarla nuevo.
-        # Guardamos una copia para poder restaurarla tal cual si se cancela.
-        self._layer_edit_backup = layer.image.copy()
-        layer.image.fill(Qt.transparent)
+        # "Levantamos" el contenido de la capa: su contenido real pasa a vivir
+        # en la imagen flotante mientras se edita, y se restaura (con los
+        # cambios) al fijarla de nuevo. Guardamos una copia (imagen + posición)
+        # para poder restaurarla tal cual si se cancela. Como su contenido ya
+        # no importa mientras esté "levantada", la dejamos con un marcador
+        # mínimo en vez de un lienzo entero en blanco (ya no hace falta asumir
+        # que las capas ocupan siempre todo el lienzo).
+        self._layer_edit_backup = (layer.image.copy(), QPoint(layer.position))
+        placeholder = QImage(1, 1, QImage.Format_ARGB32)
+        placeholder.fill(Qt.transparent)
+        layer.image = placeholder
         
         self.active_layer_index = index
         self.floating_edit_layer_index = index
         self.floating_image = cropped
-        self.floating_rect = bbox
+        self.floating_rect = absolute_rect
         self.floating_aspect = (bbox.width() / bbox.height()) if bbox.height() else 1.0
         self.floating_layer_name = layer.name
         self.floating_locked = False
@@ -925,70 +1073,54 @@ class Canvas(QWidget):
         self.layers_changed.emit()
     
     def edit_layer_content(self, index, new_image, at_point=None):
-        """Sustituye el contenido de una capa YA EXISTENTE por `new_image`
-        (recortada a su tamaño natural), colocada en `at_point` (o donde estaba
-        antes, si no se indica). A diferencia de enter_layer_edit_mode (que solo
-        mueve/redimensiona lo ya renderizado), esto se usa cuando el propio
-        objeto cambia de contenido —por ejemplo, al reeditar un texto con otras
-        palabras, tipografía o color— y hace falta volver a renderizarlo."""
+        """Sustituye el contenido de una capa YA EXISTENTE por `new_image`,
+        colocada en `at_point` (o donde estaba antes, si no se indica). A
+        diferencia de enter_layer_edit_mode (que solo mueve/redimensiona lo ya
+        renderizado), esto se usa cuando el propio objeto cambia de contenido
+        —por ejemplo, al reeditar un texto con otras palabras, tipografía o
+        color— y hace falta volver a renderizarlo."""
         if not (0 <= index < len(self.layers)):
             return
         layer = self.layers[index]
         
         # Si había un mover/redimensionar a medias sobre ESTA capa —por ejemplo,
         # el clic simple de selección que siempre precede a un doble clic ya la
-        # puso en modo edición y la dejó momentáneamente vacía—, lo resolvemos
-        # AQUÍ, ANTES de mirar dónde estaba su contenido. Si calculáramos la
-        # posición antes de este paso, leeríamos la capa todavía vacía y el
-        # texto nuevo se colocaría en la esquina (0,0), donde puede quedar
-        # tapado por otra capa (parecía que "no se aplicaban" los cambios).
+        # puso en modo edición—, lo resolvemos AQUÍ, ANTES de mirar dónde estaba
+        # su contenido (si no, leeríamos el marcador vacío temporal en vez de
+        # la posición real).
         if self.floating_image is not None:
             if self.floating_edit_layer_index == index:
                 self.cancel_floating_image()
             else:
                 self.apply_floating_image()
         
-        old_bbox = None
         if at_point is None:
+            # Posición ABSOLUTA del contenido ajustado (sin márgenes
+            # transparentes) de la capa, tal y como estaba antes de reeditarla.
             old_bbox = self._bounding_box_of_content(layer.image)
             if old_bbox is None:
-                old_bbox = QRect(0, 0, self.canvas_size, self.canvas_size)
-            at_point = QPoint(old_bbox.x(), old_bbox.y())
+                old_bbox = QRect(0, 0, layer.image.width(), layer.image.height())
+            at_point = QPoint(layer.position.x() + old_bbox.x(), layer.position.y() + old_bbox.y())
         
         # `at_point` representa dónde debe quedar el contenido AJUSTADO (sin
         # márgenes transparentes) del objeto anterior. Pero `new_image` puede
         # tener su propio margen interno alrededor del contenido real (p. ej.
-        # el texto renderizado siempre lleva un pequeño margen, y ese margen
-        # cambia con el tamaño de fuente). Si colocáramos directamente la
-        # esquina (0,0) de `new_image` en `at_point`, el contenido real
-        # quedaría desplazado hacia abajo/derecha por ese margen — y cada vez
-        # que se reeditara, se acumularía el desplazamiento. Por eso alineamos
-        # el recuadro AJUSTADO de `new_image` con `at_point`, no su esquina.
+        # el texto renderizado siempre lleva un pequeño margen, que cambia con
+        # el tamaño de fuente). Alineamos el recuadro AJUSTADO de `new_image`
+        # con `at_point`, no su esquina, para no ir desplazando el contenido
+        # en cada reedición.
         new_bbox = self._bounding_box_of_content(new_image)
         if new_bbox is not None:
             draw_point = QPoint(at_point.x() - new_bbox.x(), at_point.y() - new_bbox.y())
         else:
             draw_point = at_point
         
-        # Si el contenido nuevo es más grande que el anterior (p. ej. añadiste
-        # letras al texto), puede sobresalir del lienzo por la derecha o por
-        # abajo y quedar recortado -es decir, invisible-. Lo desplazamos hacia
-        # dentro lo justo para que quepa entero, sin mover el punto de partida
-        # si ya cabía sin problema.
-        max_x = self.canvas_size - new_image.width()
-        max_y = self.canvas_size - new_image.height()
-        draw_point = QPoint(
-            max(0, min(draw_point.x(), max_x)) if max_x >= 0 else 0,
-            max(0, min(draw_point.y(), max_y)) if max_y >= 0 else 0
-        )
-        
-        full_image = self._blank_canvas_image()
-        painter = QPainter(full_image)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.drawImage(draw_point, new_image)
-        painter.end()
-        
-        layer.image = full_image
+        # Ya no hace falta "encajar" el contenido dentro del lienzo ni
+        # recortarlo si ha crecido (p. ej. añadiste letras al texto): cada
+        # capa tiene su propia posición y tamaño libremente, y solo se recorta
+        # la VISUALIZACIÓN (ver composite_layers), nunca los datos.
+        layer.image = new_image
+        layer.position = draw_point
         self.active_layer_index = index
         self.save_to_history()
         self.update_display()
@@ -1044,14 +1176,22 @@ class Canvas(QWidget):
         return names.get(self.current_tool, "Forma")
     
     def create_object_layer(self, name, image, layer_type="generic", data=None):
-        """Crea una capa nueva (arriba de todas) con la imagen dada —ya en
-        coordenadas de canvas, tamaño canvas_size x canvas_size, resto
-        transparente—, la deja como capa activa, y la registra en su propio
-        historial. Se usa para que cada forma/texto/imagen importada sea su
-        propio objeto/capa, igual que en Photoshop. `layer_type`/`data` guardan
-        metadatos (p. ej. texto/fuente/color original) para poder reeditar el
-        objeto más adelante, no solo moverlo/redimensionarlo."""
-        layer = Layer(self._unique_layer_name(name), image)
+        """Crea una capa nueva (arriba de todas) a partir de una imagen en
+        coordenadas de canvas (tamaño canvas_size x canvas_size, resto
+        transparente): se recorta a su contenido real y se guarda junto con su
+        posición absoluta, para no arrastrar de por vida un lienzo entero de
+        margen transparente alrededor de cada objeto. La deja como capa activa
+        y la registra en su propio historial. Se usa para que cada
+        forma/texto/imagen importada sea su propio objeto/capa, igual que en
+        Photoshop. `layer_type`/`data` guardan metadatos (p. ej. texto/fuente/
+        color original) para poder reeditar el objeto más adelante, no solo
+        moverlo/redimensionarlo."""
+        bbox = self._bounding_box_of_content(image)
+        if bbox is None:
+            bbox = QRect(0, 0, image.width(), image.height())
+        cropped = image.copy(bbox)
+        
+        layer = Layer(self._unique_layer_name(name), cropped, position=bbox.topLeft())
         layer.layer_type = layer_type
         layer.data = data or {}
         self.layers.insert(0, layer)
@@ -1101,6 +1241,10 @@ class Canvas(QWidget):
             self.update_display()
             return
         
+        if event.key() == Qt.Key_Escape and (self.selection_rect is not None or self.selection_start_point is not None):
+            self.clear_selection()
+            return
+        
         super().keyPressEvent(event)
     
     def map_to_canvas(self, pos):
@@ -1129,17 +1273,61 @@ class Canvas(QWidget):
         p = self.widget_to_canvas(pos)
         return QPoint(int(p.x()), int(p.y()))
     
+    def _ensure_point_within_layer(self, layer, point):
+        """Si `point` (coords. de canvas) cae fuera de los límites actuales de
+        `layer`, agranda su imagen (y ajusta su posición) lo justo para que
+        quepa, conservando todo su contenido actual en su sitio. Hace falta
+        porque una capa puede haberse movido y haber quedado más pequeña que
+        el lienzo (recortada a su contenido real), pero se debe poder seguir
+        dibujando en cualquier parte, igual que si nunca se hubiera movido."""
+        local_x = point.x() - layer.position.x()
+        local_y = point.y() - layer.position.y()
+        w, h = layer.image.width(), layer.image.height()
+        
+        if 0 <= local_x < w and 0 <= local_y < h:
+            return  # ya cabe, no hace falta agrandar nada
+        
+        margin = 4  # margen extra, para no tener que agrandar en cada píxel
+        new_left = min(0, local_x - margin)
+        new_top = min(0, local_y - margin)
+        new_right = max(w, local_x + margin + 1)
+        new_bottom = max(h, local_y + margin + 1)
+        
+        grown = QImage(new_right - new_left, new_bottom - new_top, QImage.Format_ARGB32)
+        grown.fill(Qt.transparent)
+        painter = QPainter(grown)
+        painter.drawImage(-new_left, -new_top, layer.image)
+        painter.end()
+        
+        layer.image = grown
+        layer.position = QPoint(layer.position.x() + new_left, layer.position.y() + new_top)
+    
     def draw_point(self, point):
-        """Dibujar un punto en el canvas (lápiz/borrador; el relleno y las formas
-        se gestionan aparte, ver mousePressEvent)"""
+        """Dibujar un punto en la capa activa (lápiz/borrador; el relleno y las
+        formas se gestionan aparte, ver mousePressEvent). `point` está en
+        coordenadas de canvas; se traduce a coordenadas locales de la capa
+        activa, ya que esta puede no estar en (0,0) ni ocupar todo el lienzo
+        (p. ej. el borrador puede actuar directamente sobre una imagen
+        importada más pequeña que el lienzo)."""
         if self.current_tool in ["pencil", "eraser"]:
-            self.current_image = self.drawing_tools.draw_point(self.current_image, point)
+            layer = self.layers[self.active_layer_index]
+            if self.current_tool == "pencil":
+                self._ensure_point_within_layer(layer, point)
+            local_point = QPoint(point.x() - layer.position.x(), point.y() - layer.position.y())
+            layer.image = self.drawing_tools.draw_point(layer.image, local_point)
         self.update_display()
     
     def draw_line(self, start, end):
-        """Dibujar un trazo a mano alzada (lápiz/borrador) mientras se arrastra"""
+        """Dibujar un trazo a mano alzada (lápiz/borrador) mientras se arrastra.
+        `start`/`end` están en coordenadas de canvas; se traducen a locales de
+        la capa activa (ver draw_point)."""
         if self.current_tool in ["pencil", "eraser"]:
-            self.current_image = self.drawing_tools.draw_line(self.current_image, start, end)
+            layer = self.layers[self.active_layer_index]
+            if self.current_tool == "pencil":
+                self._ensure_point_within_layer(layer, end)
+            local_start = QPoint(start.x() - layer.position.x(), start.y() - layer.position.y())
+            local_end = QPoint(end.x() - layer.position.x(), end.y() - layer.position.y())
+            layer.image = self.drawing_tools.draw_line(layer.image, local_start, local_end)
         self.update_display()
     
     def set_fill_transparent(self, enabled):
@@ -1348,11 +1536,14 @@ class Canvas(QWidget):
         self.floating_state_changed.emit()
     
     def apply_floating_image(self):
-        """Fija la imagen/texto/objeto flotante en su posición y tamaño actuales.
-        Si venía de reeditar una capa existente (enter_layer_edit_mode), sustituye
-        el contenido de ESA MISMA capa; si es una imagen/texto/forma nueva, crea
-        una CAPA NUEVA (cada objeto insertado es su propio objeto, como en
-        Photoshop)."""
+        """Fija la imagen/texto/objeto flotante en su posición y tamaño
+        actuales, SIN recortar nada aunque quede parcialmente fuera del
+        lienzo: la capa guarda su propia posición absoluta; solo la
+        VISUALIZACIÓN se recorta al tamaño del lienzo (ver composite_layers),
+        nunca los datos. Si venía de reeditar una capa existente
+        (enter_layer_edit_mode), sustituye el contenido y la posición de ESA
+        MISMA capa; si es una imagen/texto/forma nueva, crea una CAPA NUEVA
+        (cada objeto insertado es su propio objeto, como en Photoshop)."""
         if self.floating_image is None or self.floating_rect is None:
             return
         
@@ -1360,11 +1551,7 @@ class Canvas(QWidget):
             max(1, self.floating_rect.width()), max(1, self.floating_rect.height()),
             Qt.IgnoreAspectRatio, Qt.SmoothTransformation
         )
-        layer_image = self._blank_canvas_image()
-        painter = QPainter(layer_image)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.drawImage(self.floating_rect.topLeft(), scaled)
-        painter.end()
+        position = QPoint(self.floating_rect.topLeft())
         
         name = self.floating_layer_name
         object_type = self.floating_object_type
@@ -1383,16 +1570,27 @@ class Canvas(QWidget):
         self.setCursor(Qt.CrossCursor)
         
         if edit_index is not None and 0 <= edit_index < len(self.layers):
-            # Reeditando una capa existente: se sustituye su contenido, no se
-            # crea ninguna capa nueva
-            self.layers[edit_index].image = layer_image
+            # Reeditando una capa existente: se sustituye su contenido Y su
+            # posición, no se crea ninguna capa nueva
+            self.layers[edit_index].image = scaled
+            self.layers[edit_index].position = position
             self.active_layer_index = edit_index
             self.save_to_history()
             self.update_display()
             self.image_changed.emit()
             self.layers_changed.emit()
         else:
-            self.create_object_layer(name, layer_image, layer_type=object_type, data=object_data)
+            # Objeto nuevo: `scaled` ya es su contenido ajustado (sin margen
+            # extra que recortar), así que construimos la capa directamente
+            # con su posición, sin pasar por create_object_layer.
+            layer = Layer(self._unique_layer_name(name), scaled, position=position)
+            layer.layer_type = object_type
+            layer.data = object_data or {}
+            self.layers.insert(0, layer)
+            self.active_layer_index = 0
+            self.update_display()
+            self.image_changed.emit()
+            self.layers_changed.emit()
         
         self.floating_state_changed.emit()
     
@@ -1405,7 +1603,9 @@ class Canvas(QWidget):
         
         edit_index = self.floating_edit_layer_index
         if edit_index is not None and 0 <= edit_index < len(self.layers) and self._layer_edit_backup is not None:
-            self.layers[edit_index].image = self._layer_edit_backup
+            backup_image, backup_position = self._layer_edit_backup
+            self.layers[edit_index].image = backup_image
+            self.layers[edit_index].position = backup_position
         
         self.floating_image = None
         self.floating_rect = None

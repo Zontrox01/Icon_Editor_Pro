@@ -1,60 +1,4 @@
-# Icon Editor Pro — Estructura de archivos y carpetas e Histórico de cambios y pendientes
-
-## Estructura de carpetas
-
-```
-======================================================================
-
-- FILES.md
-- README.md
-- canvas.py
-- icon_exporter.py
-- image_importer.py
-- layer.py
-- main.py
-- main_window.py
-- preview_widget.py
-- project_manager.py
-- requirements.txt
-- text_tool.py
-[CARPETA] recursos
-    - icono_app.ico
-    - icono_app.png
-    - screenshot.png
-[CARPETA] tools
-    - __init__.py
-    - drawing_tools.py
-    - shape_tools.py
-[CARPETA] ui
-    - __init__.py
-    - styles.py
-```
-
-## Detalle estructurado
-
-- 📄 FILES.md
-- 📄 README.md
-- 📄 canvas.py
-- 📄 icon_exporter.py
-- 📄 image_importer.py
-- 📄 layer.py
-- 📄 main.py
-- 📄 main_window.py
-- 📄 preview_widget.py
-- 📄 project_manager.py
-- 📄 requirements.txt
-- 📄 text_tool.py
-- 📁 recursos
-  - 📄 icono_app.ico
-  - 📄 icono_app.png
-  - 📄 screenshot.png
-- 📁 tools
-  - 📄 __init__.py
-  - 📄 drawing_tools.py
-  - 📄 shape_tools.py
-- 📁 ui
-  - 📄 __init__.py
-  - 📄 styles.py
+# Icon Editor Pro — Histórico de cambios y pendientes
 
 Seguimiento de la sesión de revisión/pulido del proyecto. Se actualiza en cada ronda de cambios.
 
@@ -278,3 +222,28 @@ Este era el fondo del problema: el modelo asumía que toda capa ocupaba EXACTAME
 ## 🔍 Pendiente de revisar (no tocado todavía)
 
 Ninguno por ahora.
+
+## 📁 Archivos del proyecto
+```
+canvas.py
+icon_exporter.py
+image_importer.py
+layer.py
+main.py
+main_window.py
+preview_widget.py
+project_manager.py
+text_tool.py
+tools/
+  __init__.py
+  drawing_tools.py
+  shape_tools.py
+ui/
+  __init__.py
+  styles.py
+README.md
+requirements.txt
+FILES.md   ← este archivo
+```
+
+**Nota:** si tienes un `test_imports.py` en tu carpeta, no lo he creado yo en ningún momento de esta conversación — no forma parte de lo que hemos ido construyendo juntos. Comprueba si algún otro archivo lo importa antes de borrarlo, por si acaso.
