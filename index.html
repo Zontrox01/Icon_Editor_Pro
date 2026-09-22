@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Icon Editor Pro – Editor de iconos por capas con PySide6</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Editor de iconos por capas para Windows/Linux/macOS, hecho con Python y PySide6. Dibuja, importa imágenes, añade texto y exporta a .ico o .png.">
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #77716d;
+      color: #e5edf5;
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(135deg, #fac88d, #2a69b9);
+      padding: 3rem 10%;
+      text-align: left;
+      color: #fdfdfd;
+    }
+    header h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 2.4rem;
+    }
+    header h2 {
+      margin: 0;
+      font-weight: 400;
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+    header p {
+      margin-top: 1.5rem;
+      max-width: 700px;
+      font-size: 1rem;
+    }
+    .hero-image {
+      margin-top: 2rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .header-flex {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+    .header-text {
+      flex: 1 1 400px;
+    }
+    .header-image {
+      flex: 0 0 320px;
+      text-align: right;
+    }
+    .header-image img {
+      width: 100%;
+      max-width: 320px;
+      border-radius: 12px;
+      border: 1px solid rgba(200, 230, 255, 0.15);
+    }
+    .hero-card {
+      flex: 1 1 260px;
+      background: rgba(5, 12, 20, 0.35);
+      border-radius: 12px;
+      padding: 1rem;
+      border: 1px solid rgba(200, 230, 255, 0.12);
+    }
+    .hero-card h3 {
+      margin-top: 0;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #b9e6ff;
+    }
+    .hero-card p {
+      font-size: 0.95rem;
+      opacity: 0.9;
+    }
+    main {
+      padding: 2.5rem 10% 3rem 10%;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    section {
+      margin-bottom: 2.5rem;
+      background: rgba(143, 129, 114, 0.9);
+      border-radius: 12px;
+      padding: 1.8rem 1.8rem 1.6rem 1.8rem;
+      border: 1px solid rgba(180, 210, 240, 0.12);
+    }
+    section h2 {
+      margin-top: 0;
+      font-size: 1.4rem;
+      border-bottom: 1px solid rgba(120, 160, 200, 0.35);
+      padding-bottom: 0.4rem;
+      margin-bottom: 1rem;
+    }
+    section h3 {
+      margin-top: 1.4rem;
+      font-size: 1.1rem;
+    }
+    p {
+      margin: 0.4rem 0 0.8rem 0;
+    }
+    .columns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .col {
+      flex: 1 1 260px;
+    }
+    .code-block {
+      background: #544c43;
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      border: 1px solid rgba(120, 160, 200, 0.35);
+    }
+    .tagline {
+      font-size: 0.95rem;
+      color: #c7d9ec;
+    }
+    .badge-row {
+      margin-top: 0.8rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .badge {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(200, 230, 255, 0.25);
+      color: #cfe7ff;
+      background: rgba(5, 15, 25, 0.7);
+    }
+    ul {
+      margin: 0.4rem 0 0.8rem 1.2rem;
+      padding: 0;
+    }
+    li {
+      margin-bottom: 0.3rem;
+    }
+    .project-structure {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      background: #101205;
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      border: 1px solid rgba(120, 160, 200, 0.35);
+      overflow-x: auto;
+      white-space: pre;
+    }
+    footer {
+      padding: 1.5rem 10%;
+      font-size: 0.8rem;
+      color: #9fb3c9;
+      border-top: 1px solid rgba(80, 110, 140, 0.4);
+      background: #544c43;
+    }
+    a {
+      color: #7fd3ff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 800px) {
+      header, main, footer {
+        padding-left: 6%;
+        padding-right: 6%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-flex">
+    <div class="header-text">
+      <h1>🎨 Icon Editor Pro</h1>
+      <h2>Editor de iconos por capas para Windows/Linux/macOS, hecho con Python y PySide6</h2>
+
+      <p>
+        Dibuja, importa imágenes, añade texto, organiza todo en capas independientes y exporta
+        directamente a <code>.ico</code>, <code>.png</code> en varios tamaños a la vez.
+      </p>
+      <p>
+        Sistema de capas al estilo editor de imágenes: cada figura, texto o imagen importada se
+        coloca en su propia capa. Selecciona, mueve, redimensiona o reedita cualquier objeto en
+        cualquier momento, sin importar cuándo lo creaste.
+      </p>
+    </div>
+
+    <div class="header-image">
+      <!-- Si tienes una imagen del editor, sustitúyela aquí -->
+      <img src="https://github.com/Zontrox01/Icon_Editor_Pro/blob/main/recursos/imagen_web.png"
+           alt="Icon Editor Pro – Editor de iconos por capas">
+    </div>
+  </div>
+
+  <div class="hero-image">
+    <div class="hero-card">
+      <h3>Capas independientes</h3>
+      <p>
+        Cada figura, texto o imagen importada se coloca en su propia capa. Selecciona, mueve,
+        redimensiona o reedita cualquier objeto en cualquier momento, sin importar cuándo lo creaste.
+      </p>
+    </div>
+    <div class="hero-card">
+      <h3>Herramientas de dibujo</h3>
+      <p>
+        Lápiz, borrador (con borrado real a transparente), línea, rectángulo, círculo, triángulo y
+        relleno por inundación con tolerancia de color ajustable.
+      </p>
+    </div>
+    <div class="hero-card">
+      <h3>Exportación a .ico y .png</h3>
+      <p>
+        Exporta a <code>.ico</code> con varios tamaños embebidos en un mismo archivo, o a
+        <code>.png</code> con transparencia real. Guarda proyectos <code>.ico_proj</code> para seguir
+        editando.
+      </p>
+    </div>
+  </div>
+
+  <div class="badge-row">
+    <span class="badge">Python 3.10+</span>
+    <span class="badge">PySide6 (Qt6)</span>
+    <span class="badge">Windows</span>
+    <span class="badge">Linux</span>
+    <span class="badge">macOS</span>
+    <span class="badge">MIT</span>
+  </div>
+</header>
+
+<main>
+
+  <section>
+    <h2>Qué es Icon Editor Pro</h2>
+    <p class="tagline">
+      Un editor de iconos por capas, completo y multiplataforma, con herramientas de dibujo,
+      importación de imágenes, texto editable y exportación a múltiples formatos.
+    </p>
+    <p>
+      <strong>Icon Editor Pro</strong> está hecho con <strong>Python</strong> y
+      <strong>PySide6</strong>. Permite dibujar, importar imágenes, añadir texto, organizar todo en
+      capas independientes y exportar directamente a <code>.ico</code> o <code>.png</code> en varios
+      tamaños a la vez.
+    </p>
+    <p>
+      El proyecto está pensado para Windows, Linux y macOS, y mantiene una estructura modular clara
+      (<code>canvas.py</code>, <code>layer.py</code>, <code>tools/</code>, <code>ui/</code>, etc.)
+      para facilitar su mantenimiento y ampliación.
+    </p>
+  </section>
+
+  <section>
+    <h2>Requisitos e instalación</h2>
+
+    <h3>Requisitos</h3>
+    <ul>
+      <li>Python 3.10 o superior.</li>
+      <li>Dependencias en <code>requirements.txt</code> (PySide6, etc.).</li>
+    </ul>
+
+    <h3>Instalación</h3>
+    <div class="code-block">
+# Clona el repositorio
+git clone https://github.com/Zontro01/icon_editor_pro.git
+cd icon_editor_pro
+
+# (Recomendado) crea un entorno virtual
+python -m venv venv
+source venv/bin/activate      # Linux/macOS
+venv\Scripts\activate         # Windows
+
+# Instala las dependencias
+pip install -r requirements.txt
+    </div>
+
+    <h3>Uso</h3>
+    <div class="code-block">
+python main.py
+    </div>
+  </section>
+
+  <section>
+    <h2>Características principales</h2>
+    <div class="columns">
+      <div class="col">
+        <h3>Sistema de capas y dibujo</h3>
+        <ul>
+          <li><strong>Sistema de capas al estilo editor de imágenes</strong>: cada figura, texto o imagen importada se coloca en su propia capa. Selecciona, mueve, redimensiona o reedita cualquier objeto en cualquier momento, sin importar cuándo lo creaste.</li>
+          <li><strong>Herramientas de dibujo</strong>: lápiz, borrador (con borrado real a transparente), línea, rectángulo, círculo, triángulo y relleno por inundación (con tolerancia de color ajustable y opción de vaciar a transparente).</li>
+          <li><strong>Herramienta de texto</strong> con tipografía, tamaño, negrita, cursiva, subrayado y color — completamente reeditable después de insertado.</li>
+          <li><strong>Importación de imágenes</strong> (PNG, JPG, BMP, GIF, TIFF, WEBP) como objetos flotantes que puedes mover y redimensionar antes de fijarlos.</li>
+        </ul>
+
+        <h3>Panel de capas</h3>
+        <ul>
+          <li>Añadir, eliminar, reordenar (subir/bajar), mostrar/ocultar y renombrar capas.</li>
+          <li><strong>Deshacer/rehacer independiente por capa</strong>.</li>
+          <li><strong>Fondo transparente o de color</strong>, configurable en cualquier momento sin afectar al contenido de las capas.</li>
+        </ul>
+      </div>
+
+      <div class="col">
+        <h3>Vista previa y exportación</h3>
+        <ul>
+          <li><strong>Vista previa en vivo</strong> a los tamaños de icono más habituales (256, 128, 64, 48, 32, 24, 16 px), a escala real.</li>
+          <li><strong>Exportación</strong> a <code>.ico</code> (con varios tamaños embebidos en un mismo archivo) y <code>.png</code>.</li>
+          <li><strong>Proyectos guardados</strong> (<code>.ico_proj</code>) que conservan todas las capas, su orden, visibilidad, y el contenido editable de los textos — no solo la imagen final.</li>
+          <li><strong>Tema claro/oscuro</strong> intercambiable desde el menú <em>Ver</em>.</li>
+          <li>Lienzo redimensionable (16 a 256 px o tamaño personalizado) y cursor de pincel que refleja el grosor real de la herramienta.</li>
+        </ul>
+
+        <h3>Formatos de exportación</h3>
+        <ul>
+          <li><strong>Icono Windows (<code>.ico</code>)</strong>: puede incluir varios tamaños en varios archivos.</li>
+          <li><strong>PNG (<code>.png</code>)</strong>: con transparencia real.</li>
+        </ul>
+        <p>
+          Los proyectos se guardan como JSON con todas las capas por separado (imagen en PNG/base64,
+          nombre, visibilidad, y en el caso de los textos, también su contenido y formato originales
+          para poder seguir editándolos). Son compatibles hacia atrás: un proyecto antiguo de una
+          sola imagen se sigue pudiendo abrir con normalidad.
+        </p>
+      </div>
+
+      <div class="col">
+        <h3>Flujo básico</h3>
+        <ol>
+          <li>Elige el tamaño del lienzo (o uno personalizado) en el panel izquierdo.</li>
+          <li>Dibuja con el lápiz, formas o texto — cada forma/texto/imagen crea su propia capa automáticamente.</li>
+          <li>Usa la herramienta <strong>✋ Mover</strong> para seleccionar y ajustar cualquier objeto ya creado, en cualquier momento.</li>
+          <li>Organiza las capas desde el panel de la derecha (subir, bajar, ocultar, renombrar).</li>
+          <li>Revisa la vista previa a los distintos tamaños de icono.</li>
+          <li>Exporta desde <em>Archivo</em> a <code>.ico</code>, <code>.png</code>, o guarda el proyecto completo (<code>.ico_proj</code>) para seguir editándolo más adelante.</li>
+        </ol>
+
+        <h3>Ideas pendientes / no implementadas</h3>
+        <ul>
+          <li>Herramientas de forma adicionales (estrella, polígono, rectángulo redondeado, flecha) — el motor ya las soportaría con poco esfuerzo.</li>
+          <li>Filtros de desenfoque/nitidez (el código existe en <code>tools/drawing_tools.py</code> pero no está conectado a ningún botón).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Capturas</h2>
+    <p>
+      _Añade aquí una captura de pantalla del editor (por ejemplo <code>recursos/screenshot.png</code>) y enlázala:_
+    </p>
+    <div class="code-block">
+![Captura de Icon Editor Pro](recursos/screenshot.png)
+    </div>
+  </section>
+
+  <section>
+    <h2>Estructura del proyecto</h2>
+    <div class="project-structure">
+icon_editor/
+├── main.py                 # Punto de entrada de la aplicación
+├── main_window.py          # Ventana principal, menús, paneles y su lógica
+├── canvas.py                # Lienzo: dibujo, capas, historial, herramientas
+├── layer.py                 # Clase Layer (imagen + nombre + visibilidad + historial propio)
+├── text_tool.py              # Diálogo de inserción/edición de texto
+├── image_importer.py         # Importación de imágenes externas
+├── icon_exporter.py           # Exportación a .ico / .png 
+├── project_manager.py         # Guardado/carga de proyectos (.ico_proj)
+├── preview_widget.py           # Tarjetas de vista previa por tamaño
+├── tools/
+│   ├── drawing_tools.py        # Lápiz, borrador, relleno
+│   └── shape_tools.py          # Formas geométricas
+├── ui/
+│   └── styles.py                # Hojas de estilo (tema claro y oscuro)
+├── recursos/
+│   └── icono_aoo.png                # Icono de la aplicación
+│   └── screenshot.png                # Captura de imagen de la aplicación
+├── requirements.txt
+└── README.md
+    </div>
+    <p>
+      El proyecto mantiene una estructura modular clara para facilitar su mantenimiento y
+      ampliación. Si el proyecto crece, se puede seguir separando en módulos adicionales.
+    </p>
+  </section>
+
+  <section>
+    <h2>Contribuir y licencia</h2>
+
+    <h3>Contribuir</h3>
+    <p>
+      Las <em>pull requests</em> son bienvenidas. Para cambios grandes, abre antes un <em>issue</em>
+      para discutir qué te gustaría cambiar.
+    </p>
+
+    <h3>Licencia</h3>
+    <p>
+      <a href="LICENSE">MIT</a>
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <p>
+    Icon Editor Pro — Editor de iconos por capas para Windows/Linux/macOS, hecho con Python y PySide6.<br>
+    Documentación completa: <code>README.md</code>.<br>
+    Repositorio del proyecto:
+    <a href="https://github.com/Zontro01/icon_editor_pro" target="_blank">
+      Icon Editor Pro en GitHub
+    </a>
+  </p>
+</footer>
+</body>
+</html>
